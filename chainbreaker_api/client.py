@@ -5,7 +5,7 @@ import requests
 import getpass
 import pandas as pd
 import matplotlib.pyplot as plt
-from PIL import Image
+#from PIL import Image
 
 class ChainBreakerClient():
 
@@ -57,10 +57,10 @@ class ChainBreakerClient():
             self.__name = res["name"]
             self.__email = res["email"]
             self.__permission = res["permission"]
-            img = Image.open("assets/images/chainbreaker.png")
-            plt.imshow(img)
-            plt.axis("off")
-            plt.show()
+            #img = Image.open("assets/images/chainbreaker.png")
+            #plt.imshow(img)
+            #plt.axis("off")
+            #plt.show()
             return "Hi {}! You are now connected to ChainBreaker API. Your current permission level is '{}'. If you have any questions don't hesitate to contact us!".format(self.__name, self.__permission)
         else: 
             print(res.text)
