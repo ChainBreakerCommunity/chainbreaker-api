@@ -9,25 +9,14 @@ from PIL import Image
 
 class ChainBreakerClient():
 
-    def __init__(self, endpoint):
-        self.__endpoint = endpoint #"https://chainbreaker-ibm-grumpy-gecko-lm.mybluemix.net/"
+    def __init__(self):
+        self.__endpoint = "https://chainbreaker-ibm-grumpy-gecko-lm.mybluemix.net/"
         self.__name = None
         self.__email = None
         self.__permission = None
         self.__token = None
         
    
-    def get_status(self):
-        """
-        Get endpoint status.
-        """
-        try:
-            res = requests.get(self.__endpoint + "/api/status").status_code
-            if res == 200:
-                return "Endpoint is online"
-        except: 
-            return "Endpoint is offline. Check our website for more information."
-
     def enter_password(self):
         """
         Enter new password function.
