@@ -10,7 +10,7 @@ from PIL import Image
 class ChainBreakerClient():
 
     def __init__(self):
-        self.__endpoint = "http://chainbreaker.community"
+        self.__endpoint = "https://chainbreaker-ibm-grumpy-gecko-lm.mybluemix.net/"
         self.__name = None
         self.__email = None
         self.__permission = None
