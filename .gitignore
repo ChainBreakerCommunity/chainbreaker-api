@@ -1,2 +1,5 @@
 # Ignore enviroment
 appenv
+
+# Ignore dist folder
+dist

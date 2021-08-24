@@ -4,7 +4,7 @@ ChainBreakerClient
 import requests
 import getpass
 import pandas as pd
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 #from PIL import Image
 
 class ChainBreakerClient():
@@ -157,7 +157,7 @@ class ChainBreakerClient():
             headers = {"x-access-token": self.__token}
             res = requests.post(self.__endpoint + "/api/data/get_ads", data = data, headers = headers).json()["ads"]
             df = pd.DataFrame(res)
-            columns = ["id_ad", "language", "link", "id_page", "title", "text", "category", "post_date", "verified_ad", "no_prepayment", "promoted_ad", "has_external_link", "external_website", "reviews_website", "website", "extract_date"]
+            columns = ["id_ad", "language", "link", "id_page", "title", "text", "category", "post_date", "verified_ad", "no_prepayment", "promoted_ad", "external_website", "reviews_website", "website", "extract_date"]
             df = df[columns]
             df.set_index("id_ad", inplace = True)
             return df
