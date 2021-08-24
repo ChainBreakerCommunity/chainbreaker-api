@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 class ChainBreakerClient():
+
     def __init__(self):
         self.__endpoint = "http://localhost:8000"
         self.__name = None
