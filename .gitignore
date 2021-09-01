@@ -3,3 +3,6 @@ appenv
 
 # Ignore dist folder
 dist
+
+# Ignore test file.
+chainbreaker_api/test.py

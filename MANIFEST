@@ -3,3 +3,4 @@ setup.cfg
 setup.py
 chainbreaker_api\__init__.py
 chainbreaker_api\client.py
+chainbreaker_api\test.py
