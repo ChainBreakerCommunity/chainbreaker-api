@@ -4,25 +4,29 @@ ChainBreakerClient
 import requests
 import getpass
 import pandas as pd
-#import matplotlib.pyplot as plt
-#from PIL import Image
+
+def token_required(f):
+    def wrapper(self, *args, **kwargs):
+        if self._token == None:
+            return "You must be logged to execute this function!"
+        return f(*args, **kwargs)
+    return wrapper
 
 class ChainBreakerClient():
 
     def __init__(self, endpoint):
-        self.__endpoint = endpoint
-        self.__name = None
-        self.__email = None
-        self.__permission = None
-        self.__token = None
-        
-   
+        self._endpoint = endpoint
+        self._name = None
+        self._email = None
+        self._permission = None
+        self._token = None
+          
     def get_status(self):
         """
         Get endpoint status.
         """
         try:
-            res = requests.get(self.__endpoint + "/api/status").status_code
+            res = requests.get(self._endpoint + "/api/status").status_code
             if res == 200:
                 return "Endpoint is online"
         except: 
@@ -40,7 +44,6 @@ class ChainBreakerClient():
             return self.enter_password()
         return new_password
 
-    
     def login(self):
         """
         This function lets the user to connect to ChainBreaker Service.
@@ -50,94 +53,102 @@ class ChainBreakerClient():
         #expiration = input("Set session expiration in minutes (enter 0 for no expiration): ")
         expiration = 0
         data = {"email": email, "password": password, "expiration": expiration}
-        res = requests.post(self.__endpoint + "/api/user/login", data)
+        res = requests.post(self._endpoint + "/api/user/login", data)
         if res.status_code == 200:
             res = res.json()
-            self.__token = res["token"]
-            self.__name = res["name"]
-            self.__email = res["email"]
-            self.__permission = res["permission"]
-            return "Hi {}! You are now connected to ChainBreaker API. Your current permission level is '{}'. If you have any questions don't hesitate to contact us!".format(self.__name, self.__permission)
+            self._token = res["token"]
+            self._name = res["name"]
+            self._email = res["email"]
+            self._permission = res["permission"]
+            return "Hi {}! You are now connected to ChainBreaker API. Your current permission level is '{}'. If you have any questions don't hesitate to contact us!".format(self._name, self._permission)
         print(res.text)
     
+    def login(self, email, password):
+        """
+        This function lets the user to connect to ChainBreaker Service programmaticaly.
+        """
+        data = {"email": email, "password": password, "expiration": 0}
+        res = requests.post(self._endpoint + "/api/user/login", data)
+        if res.status_code == 200:
+            res = res.json()
+            self._token = res["token"]
+            self._name = res["name"]
+            self._email = res["email"]
+            self._permission = res["permission"]
+            return "Hi {}! You are now connected to ChainBreaker API. Your current permission level is '{}'. If you have any questions don't hesitate to contact us!".format(self._name, self._permission)
+        print(res.text)
+
+    @token_required
     def logout(self):
         """
         This functions lets the users to logout from their account.
         """
-        if self.__token != None:
-            self.__token = None
-            self.__email = None
-            self.__name = None
-            self.__permission = None
-            print("Session closed.")
-        else: 
-            print("You are not logged.")
+        self._token = None
+        self._email = None
+        self._name = None
+        self._permission = None
+        print("Session closed.")
 
+    @token_required
     def change_password(self):
         """
         This function lets the user to change her/his password.
         """
-        if self.__token != None:
-            old_password = getpass.getpass("Old password: ")
-            new_password = self.enter_password()
-            headers = {"x-access-token": self.__token}
-            data = {"recover_password": "False", "old_password": old_password, "new_password": new_password}
-            res = requests.put(self.__endpoint + "/api/user/change_password", data = data, headers = headers).json()["message"]
-            return res
-        return "You are not logged. If you want to use this function, you have to be logged into your account."
-    
+        old_password = getpass.getpass("Old password: ")
+        new_password = self.enter_password()
+        headers = {"x-access-token": self._token}
+        data = {"recover_password": "False", "old_password": old_password, "new_password": new_password}
+        res = requests.put(self._endpoint + "/api/user/change_password", data = data, headers = headers).json()["message"]
+        return res
+
     def recover_password(self):
         """
         This function lets the user to recover her/his password, if the user forgot it.
         """
-        if self.__token == None: 
-            
+        if self._token == None: 
             # Send email.
             email = input("Email: ")
             data = {"email": email}
-            res = requests.post(self.__endpoint + "/api/user/recover_password", data = data).text
+            res = requests.post(self._endpoint + "/api/user/recover_password", data = data).text
             
             # Change password.
             token = input("Enter Recovery token  (check your email): ")
             new_password = self.enter_password()
             headers = {"x-access-token": token}
             data = {"recover_password": "True", "new_password": new_password}
-            res = requests.put(self.__endpoint + "/api/user/change_password", data = data, headers = headers).json()["message"]
+            res = requests.put(self._endpoint + "/api/user/change_password", data = data, headers = headers).json()["message"]
             return res
         return "You are logged into your account. Use this function only if you forgot your password and you are not logged into your account."
-            
+
+    @token_required        
     def create_user(self):
         """
         This functions allows administrators to create new users.
         """
-        if self.__token != None and self.__permission == "admin":
+        if  self._permission == "admin":
             name = input("User name: ")
             email = input("User email: ")
             permission = input("User permission: ")
             
-            headers = {"x-access-token": self.__token}
+            headers = {"x-access-token": self._token}
             data = {"name": name, "email": email, "permission": permission}
-            res = requests.put(self.__endpoint + "/api/user/create_user", data = data, headers = headers).json()["message"]
+            res = requests.put(self._endpoint + "/api/user/create_user", data = data, headers = headers).json()["message"]
             return res
         else: 
-            print("You can't execute this function.")
+            print("Only administrators can execute this function.")
             
+    @token_required     
     def get_account_info(self):
         """
         Print account information.
         """
         print("-- ChainBreaker Account Information --")
         print("")
-        print("Name: ", self.__name)
-        print("Email: ", self.__email)
-        print("Permission: ", self.__permission)
+        print("Name: ", self._name)
+        print("Email: ", self._email)
+        print("Permission: ", self._permission)
 
-    def get_token(self):
-        """
-        Return the token.
-        """
-        return self.__token
-    
+    @token_required
     def get_ads(self, language = "", website = "", filter_by_phones = False, filter_by_location = False): #, features = True, locations = False, comments = False, emails = False, names = False, phone = False, whatsapp = False):
         """
         This function returns ads data from ChainBreaker Database.
@@ -150,22 +161,20 @@ class ChainBreakerClient():
         - filter_by_location: Boolean. Default value: False
           - If True, you will recieve only the ads that contain a location
         """
-        if self.__token != None:
-            #data = {"features": str(features), "locations": str(locations), "comments": str(comments), "emails": str(emails), "names": str(names), "phone": str(phone), "whatsapp": str(whatsapp)}
-            filter_by_phones = 0 if filter_by_phones == False else 1
-            filter_by_location = 0 if filter_by_location == False else 1
-            
-            data = {"language": language, "website" : website, "filter_by_phones": filter_by_phones, "filter_by_location": filter_by_location}
-            headers = {"x-access-token": self.__token}
-            res = requests.post(self.__endpoint + "/api/data/get_ads", data = data, headers = headers).json()["ads"]
-            df = pd.DataFrame(res)
-            columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", "post_date", "extract_date", "website", "whatsapp", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website"]
-            df = df[columns]
-            df.set_index("id_ad", inplace = True)
-            return df
-        else: 
-            return "You are not logged!"
-
+        #data = {"features": str(features), "locations": str(locations), "comments": str(comments), "emails": str(emails), "names": str(names), "phone": str(phone), "whatsapp": str(whatsapp)}
+        filter_by_phones = 0 if filter_by_phones == False else 1
+        filter_by_location = 0 if filter_by_location == False else 1
+        
+        data = {"language": language, "website" : website, "filter_by_phones": filter_by_phones, "filter_by_location": filter_by_location}
+        headers = {"x-access-token": self._token}
+        res = requests.post(self._endpoint + "/api/data/get_ads", data = data, headers = headers).json()["ads"]
+        df = pd.DataFrame(res)
+        columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", "post_date", "extract_date", "website", "whatsapp", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website"]
+        df = df[columns]
+        df.set_index("id_ad", inplace = True)
+        return df
+ 
+    @token_required
     def get_glossary(self, domain = ""):
         """
         This function returns the glossary of terms contained in ChainBreaker Database.
@@ -173,18 +182,16 @@ class ChainBreakerClient():
         This glossary were shared by Lena Garrett from Stop The Traffik.
         For more information please contact her: Lena.Garrett@stopthetraffik.org
         """
-        if self.__token != None:
-            data = {"domain": domain}
-            headers = {"x-access-token": self.__token}
-            res = requests.post(self.__endpoint + "/api/data/get_glossary", data = data, headers = headers).json()["glossary"]
-            df = pd.DataFrame(res)
-            columns = ["id_term", "domain", "term", "definition"]
-            df = df[columns]
-            df.set_index("id_term", inplace = True)
-            return df
-        else: 
-            return "You are not logged!"
-
+        data = {"domain": domain}
+        headers = {"x-access-token": self._token}
+        res = requests.post(self._endpoint + "/api/data/get_glossary", data = data, headers = headers).json()["glossary"]
+        df = pd.DataFrame(res)
+        columns = ["id_term", "domain", "term", "definition"]
+        df = df[columns]
+        df.set_index("id_term", inplace = True)
+        return df
+   
+    @token_required
     def get_keywords(self, language = ""):
         """
         This function returns the set of keywords contained in ChainBreaker Database
@@ -192,12 +199,108 @@ class ChainBreakerClient():
         These keywords were shared by Lena Garrett from Stop The Traffik.
         For more information please contact her: Lena.Garrett@stopthetraffik.org
         """
-        if self.__token != None:
-            data = {"language": language}
-            headers = {"x-access-token": self.__token}
-            res = requests.post(self.__endpoint + "/api/data/get_keywords", data = data, headers = headers).json()["keywords"]
-            df = pd.DataFrame(res)
-            columns = ["id_keyword", "language", "keyword", "english_translation", "meaning", "age_flag", "trafficking_flag", "movement_flag"]
-            df = df[columns]
-            df.set_index("id_keyword", inplace = True)
-            return df
+        data = {"language": language}
+        headers = {"x-access-token": self._token}
+        res = requests.post(self._endpoint + "/api/data/get_keywords", data = data, headers = headers).json()["keywords"]
+        df = pd.DataFrame(res)
+        columns = ["id_keyword", "language", "keyword", "english_translation", "meaning", "age_flag", "trafficking_flag", "movement_flag"]
+        df = df[columns]
+        df.set_index("id_keyword", inplace = True)
+        return df
+
+    @token_required
+    def get_token(self):
+        return self._token
+
+class ChainBreakerScraper(ChainBreakerClient):
+    def __init__(self, endpoint):
+        super().__init__(endpoint)
+
+    @token_required
+    def get_soup(self, url):
+        """
+        Get a soup object of an url or website.
+        This function should only be used for websites without an anti-bot software.
+        ChainBreaker includes a proxy service in order to make the extraction anonymously, 
+        however this service is not always online. 
+        """
+        headers = {"x-access-token": self._token}
+        data = {"url": url}
+        return requests.post(self._endpoint + "/api/scraper/get_soup", data = data, headers = headers).json()["result"]
+
+
+    @token_required
+    def does_ad_exist(self, id_page):
+        """
+        Get if an ad exist using th id_page.
+        """
+        headers = {"x-access-token": self._token}
+        data = {"id_page": id_page}
+        return requests.post(self._endpoint + "/api/scraper/does_ad_exists", data = data, headers = headers).json()["does_ad_exist"]
+
+    @token_required
+    def format_text(self, text):
+        """
+        Format a text using ChainBreaker API in order to be compatible with CB data structure.
+        """
+        headers = {"x-access-token": self._token}
+        data = {"text": text}
+        return requests.post(self._endpoint + "/api/scraper/format_text", data = data, headers = headers).json()["text"]
+
+    @token_required
+    def insert_ad(self, author, language, link, id_page, title, text, category,
+                  post_date, extract_date, website, whatsapp, verified_ad, prepayment, 
+                  promoted_ad, email, external_website, reviews_website, comments, country, 
+                  region, city, place, latitude, longitude, zoom):
+        """
+        This function allow scraper to insert advertisements.
+        """
+        data = {}
+        data["author"] = author
+        data["language"] = language
+        data["link"] = link
+        data["id_page"] = id_page
+        data["title"] = title
+        data["text"] = text
+        data["category"] = category
+        data["post_date"] = post_date
+        data["extract_date"] = extract_date
+        data["website"] = website
+        data["whatsapp"] = whatsapp
+        data["verified_ad"] = verified_ad
+        data["prepayment"] = prepayment
+        data["promoted_ad"] = promoted_ad
+        data["email"] = email
+        data["external_website"] = external_website
+        data["reviews_website"] = reviews_website
+        data["comments"] = comments
+        data["country"] = country
+        data["region"] = region
+        data["city"] = city
+        data["place"] = place
+        data["latitude"] = latitude
+        data["longitude"] = longitude
+        data["zoom"] = zoom
+
+        headers = {"x-access-token": self._token}
+        res = requests.post(self._endpoint + "/api/scraper/insert_ad", data = data, headers = headers)
+
+        return res.status_code
+
+    @token_required
+    def get_gps(self, location):
+        """
+        Get GPS location.
+        """
+        headers = {"x-access-token": self._token}
+        data = {"location": location}
+        return requests.post(self._endpoint + "/api/scraper/get_gps", data = data, headers = headers).json()["result"]
+
+    @token_required
+    def get_phone_info(self, phone):
+        """
+        Get Phone Location.
+        """
+        headers = {"x-access-token": self._token}
+        data = {"phone": phone}
+        return requests.post(self._endpoint + "/api/scraper/get_phone_info", data = data, headers = headers).json()["result"]
