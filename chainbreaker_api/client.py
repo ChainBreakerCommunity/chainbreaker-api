@@ -4,12 +4,15 @@ ChainBreakerClient
 import requests
 import getpass
 import pandas as pd
+import os
+import functools
 
 def token_required(f):
+    @functools.wraps(f) 
     def wrapper(self, *args, **kwargs):
         if self._token == None:
             return "You must be logged to execute this function!"
-        return f(*args, **kwargs)
+        return f(self, *args, **kwargs)
     return wrapper
 
 class ChainBreakerClient():
@@ -44,12 +47,17 @@ class ChainBreakerClient():
             return self.enter_password()
         return new_password
 
-    def login(self):
+    def login(self, *args):
         """
         This function lets the user to connect to ChainBreaker Service.
         """
-        email = input("Email: ")
-        password = getpass.getpass("Password: ")
+        if len(args) == 2:
+            email = args[0]
+            password = args[1]
+            data = {"email": email, "password": password, "expiration": 0}
+        else:
+            email = input("Email: ")
+            password = getpass.getpass("Password: ")
         #expiration = input("Set session expiration in minutes (enter 0 for no expiration): ")
         expiration = 0
         data = {"email": email, "password": password, "expiration": expiration}
@@ -63,21 +71,6 @@ class ChainBreakerClient():
             return "Hi {}! You are now connected to ChainBreaker API. Your current permission level is '{}'. If you have any questions don't hesitate to contact us!".format(self._name, self._permission)
         print(res.text)
     
-    def login(self, email, password):
-        """
-        This function lets the user to connect to ChainBreaker Service programmaticaly.
-        """
-        data = {"email": email, "password": password, "expiration": 0}
-        res = requests.post(self._endpoint + "/api/user/login", data)
-        if res.status_code == 200:
-            res = res.json()
-            self._token = res["token"]
-            self._name = res["name"]
-            self._email = res["email"]
-            self._permission = res["permission"]
-            return "Hi {}! You are now connected to ChainBreaker API. Your current permission level is '{}'. If you have any questions don't hesitate to contact us!".format(self._name, self._permission)
-        print(res.text)
-
     @token_required
     def logout(self):
         """
@@ -149,37 +142,76 @@ class ChainBreakerClient():
         print("Permission: ", self._permission)
 
     @token_required
-    def get_ads(self, language = "", website = "", filter_by_phones = False, filter_by_location = False): #, features = True, locations = False, comments = False, emails = False, names = False, phone = False, whatsapp = False):
+    def get_sexual_ads(self, data_version = "1", language = "", website = "", start_date = "0001-01-01", end_date = "9999-01-01", shop_and_services = False): #, features = True, locations = False, comments = False, emails = False, names = False, phone = False, whatsapp = False):
         """
-        This function returns ads data from ChainBreaker Database.
+        This function returns sexual ads data from ChainBreaker Database.
+        - data_version: 1. For more information about data versioning, check ChainBreaker website.
         - language can be: "spanish", "english" or "" (all).
         - website can be: 
           - "mileroticos", "skokka" or "" (all) (for "spanish")
           - "leolist" or "" (all) (for "english")
-        - filter_by_phones: Boolean. Default value: False
-          - If True, you will recieve only the ads that contain a phonenumber.
-        - filter_by_location: Boolean. Default value: False
-          - If True, you will recieve only the ads that contain a location
+        - start_date: String in %Y-%m-%d format. Example: 2021-04-28. Default value: 0001-01-01
+        - end_date: String in %Y-%m-%d format. Example: 2022-08-30. Default value: 9999-01-01
         """
-        #data = {"features": str(features), "locations": str(locations), "comments": str(comments), "emails": str(emails), "names": str(names), "phone": str(phone), "whatsapp": str(whatsapp)}
-        filter_by_phones = 0 if filter_by_phones == False else 1
-        filter_by_location = 0 if filter_by_location == False else 1
-        
-        data = {"language": language, "website" : website, "filter_by_phones": filter_by_phones, "filter_by_location": filter_by_location}
+        shop_and_services = "1" if shop_and_services == True else "0"
+
         headers = {"x-access-token": self._token}
-        res = requests.post(self._endpoint + "/api/data/get_ads", data = data, headers = headers).json()["ads"]
-        df = pd.DataFrame(res)
-        columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", "post_date", "extract_date", "website", "whatsapp", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website"]
-        df = df[columns]
-        df.set_index("id_ad", inplace = True)
-        return df
+        data = {"language": language, "website" : website, "start_date": start_date, "end_date": end_date, "data_version": data_version, "shop_and_services": shop_and_services}
+        route = "/api/data/get_sexual_ads?from_id="
+            
+        def get_df(info):
+            df = pd.DataFrame(info)
+            columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", "first_post_date", "extract_date", "website", "whatsapp", "email", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website", "phone", "country", "region", "city", "place", "latitude", "longitude", "zoom"]
+            if shop_and_services: 
+                columns = columns[0: columns.index("phone") + 1]
+            df = df[columns]
+            df.set_index("id_ad", inplace = True)
+            return df
+        
+        def get_total_fetch(dataframes):
+            results_fetch = 0
+            for df in dataframes:
+                results_fetch += df.shape[0]
+            return results_fetch
+         
+        from_id = 0
+        dataframes = list()
+        
+        res = requests.post(self._endpoint + route + str(from_id), data = data, headers = headers)
+        if res.status_code == 401: 
+            res = res.json()
+            print(res["message"])
+            return pd.DataFrame()
+        
+        res = res.json()
+        df = get_df(res["ads"])
+        dataframes.append(df)
+        from_id = int(res["last_id"])
+        total_results = int(res["total_results"])
+        progress = get_total_fetch(dataframes) / total_results * 100
+        print("Progress: ", round(progress, 3))
+        
+        while get_total_fetch(dataframes) < total_results:
+            res = requests.post(self._endpoint + route + str(from_id), data = data, headers = headers)
+            if res.status_code == 401: 
+                break
+            res = res.json()
+            df = get_df(res["ads"])
+            dataframes.append(df)
+            from_id = int(res["last_id"])
+            os.system("cls")
+            progress = get_total_fetch(dataframes) / total_results * 100
+            print("Progress: ", round(progress, 3))
+        
+        # Join dataframes and return result.
+        return pd.concat(dataframes, axis=0)
  
     @token_required
     def get_glossary(self, domain = ""):
         """
         This function returns the glossary of terms contained in ChainBreaker Database.
         - domain can be: "sexual", "general" or "" (all).
-        This glossary were shared by Lena Garrett from Stop The Traffik.
+        This glossary was shared by Lena Garrett from Stop The Traffik.
         For more information please contact her: Lena.Garrett@stopthetraffik.org
         """
         data = {"domain": domain}
@@ -251,7 +283,7 @@ class ChainBreakerScraper(ChainBreakerClient):
     def insert_ad(self, author, language, link, id_page, title, text, category,
                   post_date, extract_date, website, whatsapp, verified_ad, prepayment, 
                   promoted_ad, email, external_website, reviews_website, comments, country, 
-                  region, city, place, latitude, longitude, zoom):
+                  region, city, place): #, latitude, longitude, zoom):
         """
         This function allow scraper to insert advertisements.
         """
@@ -278,29 +310,21 @@ class ChainBreakerScraper(ChainBreakerClient):
         data["region"] = region
         data["city"] = city
         data["place"] = place
-        data["latitude"] = latitude
-        data["longitude"] = longitude
-        data["zoom"] = zoom
 
         headers = {"x-access-token": self._token}
         res = requests.post(self._endpoint + "/api/scraper/insert_ad", data = data, headers = headers)
 
         return res.status_code
 
-    @token_required
-    def get_gps(self, location):
-        """
-        Get GPS location.
-        """
-        headers = {"x-access-token": self._token}
-        data = {"location": location}
-        return requests.post(self._endpoint + "/api/scraper/get_gps", data = data, headers = headers).json()["result"]
+class ChainBreakerAdmin(ChainBreakerScraper):
+    def __init__(self, endpoint):
+        super().__init__(endpoint)
 
-    @token_required
-    def get_phone_info(self, phone):
-        """
-        Get Phone Location.
-        """
-        headers = {"x-access-token": self._token}
-        data = {"phone": phone}
-        return requests.post(self._endpoint + "/api/scraper/get_phone_info", data = data, headers = headers).json()["result"]
+    def upload_gps_location(self):
+        pass
+
+    def process_image(self):
+        pass
+
+    def process_text(self):
+        pass    
