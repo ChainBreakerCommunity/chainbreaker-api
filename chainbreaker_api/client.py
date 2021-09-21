@@ -262,12 +262,12 @@ class ChainBreakerScraper(ChainBreakerClient):
 
 
     @token_required
-    def does_ad_exist(self, id_page):
+    def does_ad_exist(self, id_page, website):
         """
         Get if an ad exist using th id_page.
         """
         headers = {"x-access-token": self._token}
-        data = {"id_page": id_page}
+        data = {"id_page": id_page, "website": website}
         return requests.post(self._endpoint + "/api/scraper/does_ad_exists", data = data, headers = headers).json()["does_ad_exist"]
 
     @token_required
@@ -281,13 +281,15 @@ class ChainBreakerScraper(ChainBreakerClient):
 
     @token_required
     def insert_ad(self, author, language, link, id_page, title, text, category,
-                  post_date, extract_date, website, whatsapp, verified_ad, prepayment, 
-                  promoted_ad, email, external_website, reviews_website, comments, country, 
+                  first_post_date, extract_date, website, whatsapp, email, verified_ad, prepayment, 
+                  promoted_ad, external_website, reviews_website, phone, comments, country, 
                   region, city, place): #, latitude, longitude, zoom):
         """
         This function allow scraper to insert advertisements.
         """
         data = {}
+
+        # Ad info.
         data["author"] = author
         data["language"] = language
         data["link"] = link
@@ -295,7 +297,7 @@ class ChainBreakerScraper(ChainBreakerClient):
         data["title"] = title
         data["text"] = text
         data["category"] = category
-        data["post_date"] = post_date
+        data["first_post_date"] = first_post_date
         data["extract_date"] = extract_date
         data["website"] = website
         data["whatsapp"] = whatsapp
@@ -305,11 +307,21 @@ class ChainBreakerScraper(ChainBreakerClient):
         data["email"] = email
         data["external_website"] = external_website
         data["reviews_website"] = reviews_website
+
+        # Phone info.
+        data["phone"] = phone
+
+        # Comments info.
         data["comments"] = comments
+        
+        # Location info.
         data["country"] = country
         data["region"] = region
         data["city"] = city
         data["place"] = place
+
+        print("Data that will be sent")
+        print(data)
 
         headers = {"x-access-token": self._token}
         res = requests.post(self._endpoint + "/api/scraper/insert_ad", data = data, headers = headers)
