@@ -6,3 +6,4 @@ dist
 
 # Ignore test file.
 chainbreaker_api/test.py
+chainbreaker_api/person.jpg

@@ -6,6 +6,7 @@ import getpass
 import pandas as pd
 import os
 import functools
+import cv2
 
 def token_required(f):
     @functools.wraps(f) 
@@ -31,9 +32,12 @@ class ChainBreakerClient():
         try:
             res = requests.get(self._endpoint + "/api/status").status_code
             if res == 200:
-                return "Endpoint is online"
+                print("Endpoint is online")
+                return 200 #"Endpoint is online"
         except: 
-            return "Endpoint is offline. Check our website for more information."
+            pass 
+        print("Endpoint is offline. Check our website for more information.")
+        return 400
 
     def enter_password(self):
         """
@@ -112,23 +116,6 @@ class ChainBreakerClient():
             res = requests.put(self._endpoint + "/api/user/change_password", data = data, headers = headers).json()["message"]
             return res
         return "You are logged into your account. Use this function only if you forgot your password and you are not logged into your account."
-
-    @token_required        
-    def create_user(self):
-        """
-        This functions allows administrators to create new users.
-        """
-        if  self._permission == "admin":
-            name = input("User name: ")
-            email = input("User email: ")
-            permission = input("User permission: ")
-            
-            headers = {"x-access-token": self._token}
-            data = {"name": name, "email": email, "permission": permission}
-            res = requests.put(self._endpoint + "/api/user/create_user", data = data, headers = headers).json()["message"]
-            return res
-        else: 
-            print("Only administrators can execute this function.")
             
     @token_required     
     def get_account_info(self):
@@ -142,10 +129,9 @@ class ChainBreakerClient():
         print("Permission: ", self._permission)
 
     @token_required
-    def get_sexual_ads(self, data_version = "1", language = "", website = "", start_date = "0001-01-01", end_date = "9999-01-01", shop_and_services = False): #, features = True, locations = False, comments = False, emails = False, names = False, phone = False, whatsapp = False):
+    def get_sexual_ads(self, language = "", website = "", start_date = "0001-01-01", end_date = "9999-01-01"): #, features = True, locations = False, comments = False, emails = False, names = False, phone = False, whatsapp = False):
         """
         This function returns sexual ads data from ChainBreaker Database.
-        - data_version: 1. For more information about data versioning, check ChainBreaker website.
         - language can be: "spanish", "english" or "" (all).
         - website can be: 
           - "mileroticos", "skokka" or "" (all) (for "spanish")
@@ -153,17 +139,14 @@ class ChainBreakerClient():
         - start_date: String in %Y-%m-%d format. Example: 2021-04-28. Default value: 0001-01-01
         - end_date: String in %Y-%m-%d format. Example: 2022-08-30. Default value: 9999-01-01
         """
-        shop_and_services = "1" if shop_and_services == True else "0"
 
         headers = {"x-access-token": self._token}
-        data = {"language": language, "website" : website, "start_date": start_date, "end_date": end_date, "data_version": data_version, "shop_and_services": shop_and_services}
+        data = {"language": language, "website" : website, "start_date": start_date, "end_date": end_date}
         route = "/api/data/get_sexual_ads?from_id="
             
         def get_df(info):
             df = pd.DataFrame(info)
-            columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", "first_post_date", "extract_date", "website", "whatsapp", "email", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website", "phone", "country", "region", "city", "place", "latitude", "longitude", "zoom"]
-            if shop_and_services: 
-                columns = columns[0: columns.index("phone") + 1]
+            columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", "first_post_date", "extract_date", "website", "phone", "country", "region", "city", "place", "latitude", "longitude", "zoom", "email", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website"]
             df = df[columns]
             df.set_index("id_ad", inplace = True)
             return df
@@ -260,7 +243,6 @@ class ChainBreakerScraper(ChainBreakerClient):
         data = {"url": url}
         return requests.post(self._endpoint + "/api/scraper/get_soup", data = data, headers = headers).json()["result"]
 
-
     @token_required
     def does_ad_exist(self, id_page, website):
         """
@@ -271,19 +253,10 @@ class ChainBreakerScraper(ChainBreakerClient):
         return requests.post(self._endpoint + "/api/scraper/does_ad_exists", data = data, headers = headers).json()["does_ad_exist"]
 
     @token_required
-    def format_text(self, text):
-        """
-        Format a text using ChainBreaker API in order to be compatible with CB data structure.
-        """
-        headers = {"x-access-token": self._token}
-        data = {"text": text}
-        return requests.post(self._endpoint + "/api/scraper/format_text", data = data, headers = headers).json()["text"]
-
-    @token_required
     def insert_ad(self, author, language, link, id_page, title, text, category,
-                  first_post_date, extract_date, website, whatsapp, email, verified_ad, prepayment, 
-                  promoted_ad, external_website, reviews_website, phone, comments, country, 
-                  region, city, place): #, latitude, longitude, zoom):
+                  first_post_date, extract_date, website, phone, country, 
+                  region, city, place, email, verified_ad, prepayment, 
+                  promoted_ad, external_website, reviews_website, comments): #, latitude, longitude, zoom):
         """
         This function allow scraper to insert advertisements.
         """
@@ -300,25 +273,26 @@ class ChainBreakerScraper(ChainBreakerClient):
         data["first_post_date"] = first_post_date
         data["extract_date"] = extract_date
         data["website"] = website
-        data["whatsapp"] = whatsapp
-        data["verified_ad"] = verified_ad
-        data["prepayment"] = prepayment
-        data["promoted_ad"] = promoted_ad
-        data["email"] = email
-        data["external_website"] = external_website
-        data["reviews_website"] = reviews_website
-
+        
         # Phone info.
         data["phone"] = phone
-
-        # Comments info.
-        data["comments"] = comments
         
         # Location info.
         data["country"] = country
         data["region"] = region
         data["city"] = city
         data["place"] = place
+
+        # Extra info.
+        data["email"] = email
+        data["verified_ad"] = verified_ad
+        data["prepayment"] = prepayment
+        data["promoted_ad"] = promoted_ad
+        data["external_website"] = external_website
+        data["reviews_website"] = reviews_website
+
+        # Comments info.
+        data["comments"] = comments
 
         print("Data that will be sent")
         print(data)
@@ -328,15 +302,47 @@ class ChainBreakerScraper(ChainBreakerClient):
 
         return res.status_code
 
+    @token_required    
+    def get_image_faces(self, filepath, padding = 30):
+        headers = {"x-access-token": self._token, "content-type": "image/jpeg"}
+        
+        # Open image and change order of b, g, r to r, g, b
+        img = cv2.imread(filepath)
+        b, g, r = cv2.split(img)
+        img = cv2.merge([r, g, b])
+
+        # Encode image and send it to the app.
+        _, img_encoded = cv2.imencode(".jpg", img)
+        data = img_encoded.tobytes()
+        faces = requests.post(self._endpoint + "/api/machine_learning/get_image_faces", data = data, headers = headers).json()["faces_data"]
+
+        outputs = list()
+        for face in faces: 
+            endX = int(face["endX"])
+            endY = int(face["endY"])
+            startX = int(face["startX"])
+            startY = int(face["startY"])
+            result = img[startY - padding: endY + padding, startX - padding: endX + padding]
+            outputs.append(result)
+        return outputs
+    
 class ChainBreakerAdmin(ChainBreakerScraper):
     def __init__(self, endpoint):
         super().__init__(endpoint)
 
-    def upload_gps_location(self):
-        pass
-
-    def process_image(self):
-        pass
-
-    def process_text(self):
-        pass    
+    @token_required        
+    def create_user(self):
+        """
+        This functions allows administrators to create new users.
+        """
+        if  self._permission == "admin":
+            name = input("User name: ")
+            email = input("User email: ")
+            permission = input("User permission: ")
+            
+            headers = {"x-access-token": self._token}
+            data = {"name": name, "email": email, "permission": permission}
+            res = requests.put(self._endpoint + "/api/user/create_user", data = data, headers = headers).json()["message"]
+            return res
+        else: 
+            print("Only administrators can execute this function.")

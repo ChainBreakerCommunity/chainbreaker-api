@@ -1,0 +1,8 @@
+@token_required
+def format_text(self, text):
+    """
+    Format a text using ChainBreaker API in order to be compatible with CB data structure.
+    """
+    headers = {"x-access-token": self._token}
+    data = {"text": text}
+    return requests.post(self._endpoint + "/api/scraper/format_text", data = data, headers = headers).json()["text"]
