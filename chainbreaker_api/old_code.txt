@@ -6,3 +6,47 @@ def format_text(self, text):
     headers = {"x-access-token": self._token}
     data = {"text": text}
     return requests.post(self._endpoint + "/api/scraper/format_text", data = data, headers = headers).json()["text"]
+
+
+def classify_communities(self, server_name, server_password, country = "", progress = 0):
+        print("Hi " + self._name + ".")
+        print("Before you start the classification, we want to thank you for your support :)")
+        print("With you contribution you are fighting the crime of human trafficking")
+        print("Let's get started!")
+        print("")
+
+        print("-- Instructions --")
+        print("We will present to you different advertisements' communities.")
+        print("You will have the chance to explore these communities. In addition, you will be able to see their graph topology and also to read the advertisements' content.")
+        print("Once you are done exploring a community, our program is going to ask you to classify it.")
+        print("You can classify these communities in two categories, namely: 'suspicious' and 'not suspicious'")
+        print("The previous task is going to take you a while since we have more than 250 communities identified, so you can resume the task later if you are tired.")
+        print("All that you need to do to resume the task, is to chance the 'progress' parameter")
+        print("")
+
+        ready = input("Are you ready? Y/N")
+        if ready == "N":
+            return False
+
+        communities = self.get_communities(country)
+        if progress > len(communities):
+            return "Invalid progress number. It must be between 0 and " + str(len(communities))
+    
+        for i in range(progress, len(communities)):
+            community = communities[i]
+            if len(community) >= 8:
+                file_path = data_science.generate_community_graph(server_name, server_password, community)
+                import os
+
+                #import IPython
+                #IPython.display.HTML(filename = file_path)
+                webbrowser.open("file://" + os.path.realpath(file_path))
+
+                category = input("Is this community suspicious? Y/N")
+                progress += 1
+                #webbrowser.quit()
+                continue_ = input("Do you want to continue? Y/N")
+                if continue_ == "N":
+                    return "Take a rest and don't forget to come later! Your current progress is " + str(progress) + ". Once you resume, don't forget to input your progress in the function." 
+                else:
+                    print("Great!")

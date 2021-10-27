@@ -7,6 +7,8 @@ import pandas as pd
 import os
 import functools
 import cv2
+import webbrowser
+from typing import List
 
 def token_required(f):
     @functools.wraps(f) 
@@ -129,6 +131,17 @@ class ChainBreakerClient():
         print("Permission: ", self._permission)
 
     @token_required
+    def get_df(self, info):
+        df = pd.DataFrame(info)
+        columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", 
+        "first_post_date", "extract_date", "website", "phone", "country", "region", "city", "place", "latitude", 
+        "longitude", "zoom", "email", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website", 
+        "nationality", "age"]
+        df = df[columns]
+        df.set_index("id_ad", inplace = True)
+        return df
+
+    @token_required
     def get_sexual_ads(self, language = "", website = "", start_date = "0001-01-01", end_date = "9999-01-01"): #, features = True, locations = False, comments = False, emails = False, names = False, phone = False, whatsapp = False):
         """
         This function returns sexual ads data from ChainBreaker Database.
@@ -144,13 +157,6 @@ class ChainBreakerClient():
         data = {"language": language, "website" : website, "start_date": start_date, "end_date": end_date}
         route = "/api/data/get_sexual_ads?from_id="
             
-        def get_df(info):
-            df = pd.DataFrame(info)
-            columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", "first_post_date", "extract_date", "website", "phone", "country", "region", "city", "place", "latitude", "longitude", "zoom", "email", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website"]
-            df = df[columns]
-            df.set_index("id_ad", inplace = True)
-            return df
-        
         def get_total_fetch(dataframes):
             results_fetch = 0
             for df in dataframes:
@@ -167,7 +173,7 @@ class ChainBreakerClient():
             return pd.DataFrame()
         
         res = res.json()
-        df = get_df(res["ads"])
+        df = self.get_df(res["ads"])
         dataframes.append(df)
         from_id = int(res["last_id"])
         total_results = int(res["total_results"])
@@ -179,7 +185,7 @@ class ChainBreakerClient():
             if res.status_code == 401: 
                 break
             res = res.json()
-            df = get_df(res["ads"])
+            df = self.get_df(res["ads"])
             dataframes.append(df)
             from_id = int(res["last_id"])
             os.system("cls")
@@ -188,7 +194,20 @@ class ChainBreakerClient():
         
         # Join dataframes and return result.
         return pd.concat(dataframes, axis=0)
- 
+    
+    @token_required
+    def get_sexual_ads_by_id(self, ids_list: List[int]):
+        data = {"ads_ids": ids_list}
+        headers = {"x-access-token": self._token}
+        res = requests.post(self._endpoint + "/api/data/get_sexual_ads_by_id", data = data, headers = headers) #.json()["ads"]
+        if res.status_code != 200: 
+            res = res.json()
+            print(res["message"])
+            return pd.DataFrame()
+        res = res.json()
+        df = self.get_df(res["ads"])
+        return df
+
     @token_required
     def get_glossary(self, domain = ""):
         """
@@ -224,8 +243,41 @@ class ChainBreakerClient():
         return df
 
     @token_required
+    def get_communities(self, country = ""):
+        data = {"country": country}
+        res = requests.post(self._endpoint + "/api/graph/get_communities", data = data)
+        communities = res.json()["communities"]
+        new_map = {}
+        for key, value in communities.items():
+            new_array = list()
+            for val in value:
+                new_array.append(int(val))
+            new_map[int(key)] = new_array
+        return new_map
+
+    @token_required
+    def export_communities(self, country = "", export_file = ""):
+        communities = self.get_communities(country = country)
+        for key, ads_ids in communities.items():
+            df = self.get_sexual_ads_by_id(ads_ids)
+            df.to_excel(export_file + "/community_" + str(key) + ".xlsx")
+
+    @token_required
+    def get_labels_count(self):
+        res = requests.get(self._endpoint + "/api/graph/get_labels_count")
+        return pd.DataFrame(res.json()["labels_count"])
+
+    @token_required
+    def get_communities_stats(self, country = ""):
+        return True
+
+    @token_required
     def get_token(self):
         return self._token
+
+class ChainBreakerExpert(ChainBreakerClient):
+    def __init__(self, endpoint):
+        super().__init__(endpoint)
 
 class ChainBreakerScraper(ChainBreakerClient):
     def __init__(self, endpoint):
@@ -256,7 +308,8 @@ class ChainBreakerScraper(ChainBreakerClient):
     def insert_ad(self, author, language, link, id_page, title, text, category,
                   first_post_date, extract_date, website, phone, country, 
                   region, city, place, email, verified_ad, prepayment, 
-                  promoted_ad, external_website, reviews_website, comments): #, latitude, longitude, zoom):
+                  promoted_ad, external_website, reviews_website, comments,
+                  latitude, longitude, nationality, age):
         """
         This function allow scraper to insert advertisements.
         """
@@ -293,6 +346,12 @@ class ChainBreakerScraper(ChainBreakerClient):
 
         # Comments info.
         data["comments"] = comments
+
+        # Extra parameters.
+        data["latitude"] = latitude
+        data["longitude"] = longitude
+        data["nationality"] = nationality
+        data["age"] = age
 
         print("Data that will be sent")
         print(data)
