@@ -53,6 +53,19 @@ class ChainBreakerClient():
             return self.enter_password()
         return new_password
 
+    def register(self):
+        """
+        This functions lets users to register to ChainBreaker.
+        """
+        name = input("Enter your name: ")
+        email = input("Enter your email: ")
+        data = {"name": name, "email": email}
+        res = requests.put(self._endpoint + "/api/user/register", data)
+        if res.status_code == 200:
+            return "Your account has been created succesfully. Your current permission is 'reader'. If you require more advanced permissions please write us an email to chainbreakerinfo@gmail.com."
+        else:
+            return "Error. Your account has not been created. Please try later or contact us to chainbreakerinfo@gmail.com."
+
     def login(self, *args):
         """
         This function lets the user to connect to ChainBreaker Service.
@@ -131,12 +144,14 @@ class ChainBreakerClient():
         print("Permission: ", self._permission)
 
     @token_required
-    def get_df(self, info):
+    def get_df(self, info, reduced = False):
         df = pd.DataFrame(info)
         columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", 
         "first_post_date", "extract_date", "website", "phone", "country", "region", "city", "place", "latitude", 
         "longitude", "zoom", "email", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website", 
-        "nationality", "age"]
+        "nationality", "age", "score_risk"]
+        if reduced: 
+            columns = ["id_ad", "language", "title", "text", "category", "country", "city", "external_website"]
         df = df[columns]
         df.set_index("id_ad", inplace = True)
         return df
@@ -196,8 +211,9 @@ class ChainBreakerClient():
         return pd.concat(dataframes, axis=0)
     
     @token_required
-    def get_sexual_ads_by_id(self, ids_list: List[int]):
-        data = {"ads_ids": ids_list}
+    def get_sexual_ads_by_id(self, ids_list: List[int], reduced_version = False):
+        reduced_version = "0" if reduced_version == False else "1"
+        data = {"ads_ids": ids_list, "reduced_version": reduced_version}
         headers = {"x-access-token": self._token}
         res = requests.post(self._endpoint + "/api/data/get_sexual_ads_by_id", data = data, headers = headers) #.json()["ads"]
         if res.status_code != 200: 
@@ -205,7 +221,7 @@ class ChainBreakerClient():
             print(res["message"])
             return pd.DataFrame()
         res = res.json()
-        df = self.get_df(res["ads"])
+        df = self.get_df(res["ads"], reduced = bool(int(reduced_version)))
         return df
 
     @token_required
@@ -243,29 +259,68 @@ class ChainBreakerClient():
         return df
 
     @token_required
+    def search_phone(self, phone):
+        headers = {"x-access-token": self._token}
+        data = {"phone": phone}
+        res = requests.post(self._endpoint + "/api/data/search_phone", data = data, headers = headers)
+        if res.status_code == 200:
+            res = res.json()
+            df = self.get_df(res["ads"])
+            print("Warning: The phone number score risk is experimental. Avoid to use it to take decisions.")
+            return df
+        else: 
+            print("Phone not found.")
+            return 404
+        
+    @token_required
+    def get_phone_score_risk(self, phone):
+        headers = {"x-access-token": self._token}
+        data = {"phone": phone}
+        res = requests.post(self._endpoint + "/api/data/get_phone_score_risk", data = data, headers = headers)
+        if res.status_code == 200:
+            score_risk = res.json()["score_risk"]
+            print("Warning: This phone number score risk is experimental. Avoid to use it to take decisions.")
+            return score_risk
+        else: 
+            print("Phone not found.")
+            return 404
+
+    @token_required
     def get_communities(self, country = ""):
+        headers = {"x-access-token": self._token}
         data = {"country": country}
-        res = requests.post(self._endpoint + "/api/graph/get_communities", data = data)
-        communities = res.json()["communities"]
-        new_map = {}
-        for key, value in communities.items():
-            new_array = list()
-            for val in value:
-                new_array.append(int(val))
-            new_map[int(key)] = new_array
-        return new_map
+        res = requests.post(self._endpoint + "/api/graph/get_communities", data = data, headers = headers)
+        if res.status_code == 200:
+            communities = res.json()["communities"]
+            new_map = {}
+            for key, value in communities.items():
+                new_array = list()
+                for val in value:
+                    new_array.append(int(val))
+                new_map[int(key)] = new_array
+            return new_map
+        else: 
+            message = res.json()["message"]
+            print(message)
+            return 404
 
     @token_required
     def export_communities(self, country = "", export_file = ""):
         communities = self.get_communities(country = country)
-        for key, ads_ids in communities.items():
-            df = self.get_sexual_ads_by_id(ads_ids)
-            df.to_excel(export_file + "/community_" + str(key) + ".xlsx")
+        if communities != 404:
+            for key, ads_ids in communities.items():
+                df = self.get_sexual_ads_by_id(ads_ids)
+                df.to_excel(export_file + "/community_" + str(key) + ".xlsx")
 
     @token_required
     def get_labels_count(self):
         res = requests.get(self._endpoint + "/api/graph/get_labels_count")
-        return pd.DataFrame(res.json()["labels_count"])
+        if res.status_code == 200:
+            return pd.DataFrame(res.json()["labels_count"])
+        else: 
+            message = res.json()["message"]
+            print(message)
+            return 404
 
     @token_required
     def get_communities_stats(self, country = ""):
@@ -296,12 +351,12 @@ class ChainBreakerScraper(ChainBreakerClient):
         return requests.post(self._endpoint + "/api/scraper/get_soup", data = data, headers = headers).json()["result"]
 
     @token_required
-    def does_ad_exist(self, id_page, website):
+    def does_ad_exist(self, id_page, website, country):
         """
         Get if an ad exist using th id_page.
         """
         headers = {"x-access-token": self._token}
-        data = {"id_page": id_page, "website": website}
+        data = {"id_page": id_page, "website": website, "country": country}
         return requests.post(self._endpoint + "/api/scraper/does_ad_exists", data = data, headers = headers).json()["does_ad_exist"]
 
     @token_required
@@ -363,27 +418,27 @@ class ChainBreakerScraper(ChainBreakerClient):
 
     @token_required    
     def get_image_faces(self, filepath, padding = 30):
-        headers = {"x-access-token": self._token, "content-type": "image/jpeg"}
+        #headers = {"x-access-token": self._token, "content-type": "image/jpeg"}
         
         # Open image and change order of b, g, r to r, g, b
-        img = cv2.imread(filepath)
-        b, g, r = cv2.split(img)
-        img = cv2.merge([r, g, b])
+        #img = cv2.imread(filepath)
+        #b, g, r = cv2.split(img)
+        #img = cv2.merge([r, g, b])
 
         # Encode image and send it to the app.
-        _, img_encoded = cv2.imencode(".jpg", img)
-        data = img_encoded.tobytes()
-        faces = requests.post(self._endpoint + "/api/machine_learning/get_image_faces", data = data, headers = headers).json()["faces_data"]
+        #_, img_encoded = cv2.imencode(".jpg", img)
+        #data = img_encoded.tobytes()
+        #faces = requests.post(self._endpoint + "/api/machine_learning/get_image_faces", data = data, headers = headers).json()["faces_data"]
 
-        outputs = list()
-        for face in faces: 
-            endX = int(face["endX"])
-            endY = int(face["endY"])
-            startX = int(face["startX"])
-            startY = int(face["startY"])
-            result = img[startY - padding: endY + padding, startX - padding: endX + padding]
-            outputs.append(result)
-        return outputs
+        #outputs = list()
+        #for face in faces: 
+        #    endX = int(face["endX"])
+        #    endY = int(face["endY"])
+        #    startX = int(face["startX"])
+        #    startY = int(face["startY"])
+        #    result = img[startY - padding: endY + padding, startX - padding: endX + padding]
+        #    outputs.append(result)
+        return "Sorry. Service not currently available."
     
 class ChainBreakerAdmin(ChainBreakerScraper):
     def __init__(self, endpoint):
