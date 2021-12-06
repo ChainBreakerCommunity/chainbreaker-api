@@ -3,7 +3,7 @@ from distutils.core import setup
 setup(
   name = 'chainbreaker_api',         # How you named your package folder (MyLib)
   packages = ['chainbreaker_api'],   # Chose the same as "name"
-  version = '0.0.9',      # Start with a small number and increase it with every change you make
+  version = '1.0.0',      # Start with a small number and increase it with every change you make
   license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
   description = 'Python library for connecting and using ChainBreaker Community Services.',   # Give a short description about your library
   author = 'Juan Cepeda',                   # Type in your name
