@@ -6,7 +6,6 @@ import getpass
 import pandas as pd
 import os
 import functools
-import cv2
 import webbrowser
 from typing import List
 
