@@ -148,7 +148,7 @@ class ChainBreakerClient():
         columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", 
         "first_post_date", "extract_date", "website", "phone", "country", "region", "city", "place", "latitude", 
         "longitude", "zoom", "email", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website", 
-        "nationality", "age", "score_risk"]
+        "ethnicity", "nationality", "age", "score_risk"]
         if reduced: 
             columns = ["id_ad", "language", "title", "text", "category", "country", "city", "external_website"]
         df = df[columns]
@@ -363,7 +363,7 @@ class ChainBreakerScraper(ChainBreakerClient):
                   first_post_date, extract_date, website, phone, country, 
                   region, city, place, email, verified_ad, prepayment, 
                   promoted_ad, external_website, reviews_website, comments,
-                  latitude, longitude, nationality, age):
+                  latitude, longitude, ethnicity, nationality, age):
         """
         This function allow scraper to insert advertisements.
         """
@@ -404,6 +404,7 @@ class ChainBreakerScraper(ChainBreakerClient):
         # Extra parameters.
         data["latitude"] = latitude
         data["longitude"] = longitude
+        data["ethnicity"] = ethnicity
         data["nationality"] = nationality
         data["age"] = age
 
