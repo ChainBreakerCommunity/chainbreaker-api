@@ -31,7 +31,7 @@ class ChainBreakerClient():
         Get endpoint status.
         """
         try:
-            res = requests.get(self._endpoint + "/api/status").status_code
+            res = requests.get(self._endpoint + "/status").status_code
             if res == 200:
                 print("Endpoint is online")
                 return 200 #"Endpoint is online"
@@ -58,8 +58,9 @@ class ChainBreakerClient():
         """
         name = input("Enter your name: ")
         email = input("Enter your email: ")
-        data = {"name": name, "email": email}
-        res = requests.put(self._endpoint + "/api/user/register", data)
+        password = input("Enter your password: ")
+        data = {"name": name, "email": email, "password": password}
+        res = requests.put(self._endpoint + "/user/register", data)
         if res.status_code == 200:
             return "Your account has been created succesfully. Your current permission is 'reader'. If you require more advanced permissions please write us an email to chainbreakerinfo@gmail.com."
         else:
@@ -79,7 +80,7 @@ class ChainBreakerClient():
         #expiration = input("Set session expiration in minutes (enter 0 for no expiration): ")
         expiration = 0
         data = {"email": email, "password": password, "expiration": expiration}
-        res = requests.post(self._endpoint + "/api/user/login", data)
+        res = requests.post(self._endpoint + "/user/login", data)
         if res.status_code == 200:
             res = res.json()
             self._token = res["token"]
@@ -109,25 +110,26 @@ class ChainBreakerClient():
         new_password = self.enter_password()
         headers = {"x-access-token": self._token}
         data = {"recover_password": "False", "old_password": old_password, "new_password": new_password}
-        res = requests.put(self._endpoint + "/api/user/change_password", data = data, headers = headers).json()["message"]
+        res = requests.put(self._endpoint + "/user/change_password", data = data, headers = headers).json()["message"]
         return res
 
     def recover_password(self):
         """
         This function lets the user to recover her/his password, if the user forgot it.
         """
+        return "Please email to chainbreakerinfo@gmail.com asking for a recover of your password."
         if self._token == None: 
             # Send email.
             email = input("Email: ")
             data = {"email": email}
-            res = requests.post(self._endpoint + "/api/user/recover_password", data = data).text
+            res = requests.post(self._endpoint + "/user/recover_password", data = data).text
             
             # Change password.
             token = input("Enter Recovery token  (check your email): ")
             new_password = self.enter_password()
             headers = {"x-access-token": token}
             data = {"recover_password": "True", "new_password": new_password}
-            res = requests.put(self._endpoint + "/api/user/change_password", data = data, headers = headers).json()["message"]
+            res = requests.put(self._endpoint + "/user/change_password", data = data, headers = headers).json()["message"]
             return res
         return "You are logged into your account. Use this function only if you forgot your password and you are not logged into your account."
             
@@ -169,7 +171,7 @@ class ChainBreakerClient():
 
         headers = {"x-access-token": self._token}
         data = {"language": language, "website" : website, "start_date": start_date, "end_date": end_date}
-        route = "/api/data/get_sexual_ads?from_id="
+        route = "/data/get_sexual_ads?from_id="
             
         def get_total_fetch(dataframes):
             results_fetch = 0
@@ -214,7 +216,7 @@ class ChainBreakerClient():
         reduced_version = "0" if reduced_version == False else "1"
         data = {"ads_ids": ids_list, "reduced_version": reduced_version}
         headers = {"x-access-token": self._token}
-        res = requests.post(self._endpoint + "/api/data/get_sexual_ads_by_id", data = data, headers = headers) #.json()["ads"]
+        res = requests.post(self._endpoint + "/data/get_sexual_ads_by_id", data = data, headers = headers) #.json()["ads"]
         if res.status_code != 200: 
             res = res.json()
             print(res["message"])
@@ -233,7 +235,7 @@ class ChainBreakerClient():
         """
         data = {"domain": domain}
         headers = {"x-access-token": self._token}
-        res = requests.post(self._endpoint + "/api/data/get_glossary", data = data, headers = headers).json()["glossary"]
+        res = requests.post(self._endpoint + "/data/get_glossary", data = data, headers = headers).json()["glossary"]
         df = pd.DataFrame(res)
         columns = ["id_term", "domain", "term", "definition"]
         df = df[columns]
@@ -250,7 +252,7 @@ class ChainBreakerClient():
         """
         data = {"language": language}
         headers = {"x-access-token": self._token}
-        res = requests.post(self._endpoint + "/api/data/get_keywords", data = data, headers = headers).json()["keywords"]
+        res = requests.post(self._endpoint + "/data/get_keywords", data = data, headers = headers).json()["keywords"]
         df = pd.DataFrame(res)
         columns = ["id_keyword", "language", "keyword", "english_translation", "meaning", "age_flag", "trafficking_flag", "movement_flag"]
         df = df[columns]
@@ -261,7 +263,7 @@ class ChainBreakerClient():
     def search_phone(self, phone):
         headers = {"x-access-token": self._token}
         data = {"phone": phone}
-        res = requests.post(self._endpoint + "/api/data/search_phone", data = data, headers = headers)
+        res = requests.post(self._endpoint + "/data/search_phone", data = data, headers = headers)
         if res.status_code == 200:
             res = res.json()
             df = self.get_df(res["ads"])
@@ -275,7 +277,7 @@ class ChainBreakerClient():
     def get_phone_score_risk(self, phone):
         headers = {"x-access-token": self._token}
         data = {"phone": phone}
-        res = requests.post(self._endpoint + "/api/data/get_phone_score_risk", data = data, headers = headers)
+        res = requests.post(self._endpoint + "/data/get_phone_score_risk", data = data, headers = headers)
         if res.status_code == 200:
             score_risk = res.json()["score_risk"]
             print("Warning: This phone number score risk is experimental. Avoid to use it to take decisions.")
@@ -288,7 +290,7 @@ class ChainBreakerClient():
     def get_communities(self, country = ""):
         headers = {"x-access-token": self._token}
         data = {"country": country}
-        res = requests.post(self._endpoint + "/api/graph/get_communities", data = data, headers = headers)
+        res = requests.post(self._endpoint + "/graph/get_communities", data = data, headers = headers)
         if res.status_code == 200:
             communities = res.json()["communities"]
             new_map = {}
@@ -313,7 +315,7 @@ class ChainBreakerClient():
 
     @token_required
     def get_labels_count(self):
-        res = requests.get(self._endpoint + "/api/graph/get_labels_count")
+        res = requests.get(self._endpoint + "/graph/get_labels_count")
         if res.status_code == 200:
             return pd.DataFrame(res.json()["labels_count"])
         else: 
@@ -347,7 +349,7 @@ class ChainBreakerScraper(ChainBreakerClient):
         """
         headers = {"x-access-token": self._token}
         data = {"url": url}
-        return requests.post(self._endpoint + "/api/scraper/get_soup", data = data, headers = headers).json()["result"]
+        return requests.post(self._endpoint + "/scraper/get_soup", data = data, headers = headers).json()["result"]
 
     @token_required
     def does_ad_exist(self, id_page, website, country):
@@ -356,7 +358,7 @@ class ChainBreakerScraper(ChainBreakerClient):
         """
         headers = {"x-access-token": self._token}
         data = {"id_page": id_page, "website": website, "country": country}
-        return requests.post(self._endpoint + "/api/scraper/does_ad_exists", data = data, headers = headers).json()["does_ad_exist"]
+        return requests.post(self._endpoint + "/scraper/does_ad_exists", data = data, headers = headers).json()["does_ad_exist"]
 
     @token_required
     def insert_ad(self, author, language, link, id_page, title, text, category,
@@ -408,13 +410,9 @@ class ChainBreakerScraper(ChainBreakerClient):
         data["nationality"] = nationality
         data["age"] = age
 
-        print("Data that will be sent")
-        print(data)
-
         headers = {"x-access-token": self._token}
-        res = requests.post(self._endpoint + "/api/scraper/insert_ad", data = data, headers = headers)
-
-        return res.status_code
+        res = requests.post(self._endpoint + "/scraper/insert_ad", data = data, headers = headers)
+        return data, res
 
     @token_required    
     def get_image_faces(self, filepath, padding = 30):
@@ -456,7 +454,7 @@ class ChainBreakerAdmin(ChainBreakerScraper):
             
             headers = {"x-access-token": self._token}
             data = {"name": name, "email": email, "permission": permission}
-            res = requests.put(self._endpoint + "/api/user/create_user", data = data, headers = headers).json()["message"]
+            res = requests.put(self._endpoint + "/user/create_user", data = data, headers = headers).json()["message"]
             return res
         else: 
             print("Only administrators can execute this function.")
