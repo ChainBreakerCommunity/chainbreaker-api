@@ -1,5 +1,6 @@
 # Ignore enviroment
-appenv
+env
+.env
 
 # Ignore dist folder
 dist

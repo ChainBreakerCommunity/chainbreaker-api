@@ -9,6 +9,8 @@ import functools
 import webbrowser
 from typing import List
 
+API_VERSION = "1.0.4"
+
 def token_required(f):
     @functools.wraps(f) 
     def wrapper(self, *args, **kwargs):
@@ -38,6 +40,11 @@ class ChainBreakerClient():
         except: 
             pass 
         print("Endpoint is offline. Check our website for more information.")
+        api_version = res.json()["api_version"]
+        if api_version != API_VERSION:
+            print(f"""Please update ChainBreakerAPI package, server is using {api_version} 
+                      and your current version is {API_VERSION}. This might generate errors in some 
+                      functions.""".replace("\n", " "))
         return 400
 
     def enter_password(self):
@@ -149,10 +156,10 @@ class ChainBreakerClient():
         df = pd.DataFrame(info)
         columns = ["id_ad", "data_version", "author", "language", "link", "id_page", "title", "text", "category", 
         "first_post_date", "extract_date", "website", "phone", "country", "region", "city", "place", "latitude", 
-        "longitude", "zoom", "email", "verified_ad", "prepayment", "promoted_ad", "external_website", "reviews_website", 
-        "ethnicity", "nationality", "age", "score_risk"]
+        "longitude", "zoom", "email", "external_website", "reviews_website", 
+        "ethnicity", "nationality", "age", "screenshot", "score_risk"]
         if reduced: 
-            columns = ["id_ad", "language", "title", "text", "category", "country", "city", "external_website"]
+            columns = ["id_ad", "link", "title", "text", "first_post_date", "website", "ethnicity", "phone", "country", "region", "city", "external_website", "screenshot"]
         df = df[columns]
         df.set_index("id_ad", inplace = True)
         return df
@@ -267,7 +274,6 @@ class ChainBreakerClient():
         if res.status_code == 200:
             res = res.json()
             df = self.get_df(res["ads"])
-            print("Warning: The phone number score risk is experimental. Avoid to use it to take decisions.")
             return df
         else: 
             print("Phone not found.")
@@ -280,7 +286,6 @@ class ChainBreakerClient():
         res = requests.post(self._endpoint + "/data/get_phone_score_risk", data = data, headers = headers)
         if res.status_code == 200:
             score_risk = res.json()["score_risk"]
-            print("Warning: This phone number score risk is experimental. Avoid to use it to take decisions.")
             return score_risk
         else: 
             print("Phone not found.")
@@ -292,26 +297,23 @@ class ChainBreakerClient():
         data = {"country": country}
         res = requests.post(self._endpoint + "/graph/get_communities", data = data, headers = headers)
         if res.status_code == 200:
-            communities = res.json()["communities"]
-            new_map = {}
-            for key, value in communities.items():
-                new_array = list()
-                for val in value:
-                    new_array.append(int(val))
-                new_map[int(key)] = new_array
-            return new_map
+            communities = res.json()["communities"] 
+            for community in communities:
+                for i in range(len(community)):
+                    community[i] = int(community[i])
+            return communities
         else: 
             message = res.json()["message"]
             print(message)
             return 404
 
     @token_required
-    def export_communities(self, country = "", export_file = ""):
-        communities = self.get_communities(country = country)
-        if communities != 404:
-            for key, ads_ids in communities.items():
-                df = self.get_sexual_ads_by_id(ads_ids)
-                df.to_excel(export_file + "/community_" + str(key) + ".xlsx")
+    def download_communities(self, country: str, start_date: str = "0001-01-01", end_date: str = "2022-07-20", export_folder: str = ""):
+        headers = {"x-access-token": self._token}
+        data = {"country": country, "start_date": start_date, "end_date": end_date}
+        res = requests.post(self._endpoint + "/graph/download_communities", data = data, headers = headers)
+        with open(f"./{export_folder}/communities_{country}_from_{start_date}_to_{end_date}.xlsx", "wb") as f:
+            f.write(res.content)
 
     @token_required
     def get_labels_count(self):
@@ -363,9 +365,8 @@ class ChainBreakerScraper(ChainBreakerClient):
     @token_required
     def insert_ad(self, author, language, link, id_page, title, text, category,
                   first_post_date, extract_date, website, phone, country, 
-                  region, city, place, email, verified_ad, prepayment, 
-                  promoted_ad, external_website, reviews_website, comments,
-                  latitude, longitude, ethnicity, nationality, age):
+                  region, city, place, email, external_website, reviews_website, comments,
+                  latitude, longitude, ethnicity, nationality, age, screenshot):
         """
         This function allow scraper to insert advertisements.
         """
@@ -394,9 +395,6 @@ class ChainBreakerScraper(ChainBreakerClient):
 
         # Extra info.
         data["email"] = email
-        data["verified_ad"] = verified_ad
-        data["prepayment"] = prepayment
-        data["promoted_ad"] = promoted_ad
         data["external_website"] = external_website
         data["reviews_website"] = reviews_website
 
@@ -409,6 +407,7 @@ class ChainBreakerScraper(ChainBreakerClient):
         data["ethnicity"] = ethnicity
         data["nationality"] = nationality
         data["age"] = age
+        data["screenshot"] = screenshot
 
         headers = {"x-access-token": self._token}
         res = requests.post(self._endpoint + "/scraper/insert_ad", data = data, headers = headers)
